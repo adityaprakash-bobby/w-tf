@@ -31,6 +31,7 @@ resource "aws_autoscaling_group" "webserver" {
     desired_capacity          = 3
     launch_configuration      = aws_launch_configuration.webserver.name
     vpc_zone_identifier       = data.aws_subnet_ids.default.ids
+    target_group_arns         = [aws_lb_target_group.webserver-tg.arn]
 
     tag {
         key                 = "Name"
@@ -48,7 +49,7 @@ resource "aws_lb" "webserver" {
 }
 
 resource "aws_lb_listener" "httplistener" {
-    load_balancer_arn = aws_lb.webserver.load_balancer_arn
+    load_balancer_arn = aws_lb.webserver.arn
     port              = 80
     protocol          = "HTTP"
 
@@ -74,12 +75,29 @@ resource "aws_lb_target_group" "webserver-tg" {
         path                = "/"
         protocol            = "HTTP"
         matcher             = "200"
-        internal            = 15
+        interval            = 15
         timeout             = 5
         healthy_threshold   = 2
         unhealthy_threshold = 2
     }
 }
+
+resource "aws_lb_listener_rule" "webserver-tg-listenerrule" {
+    listener_arn = aws_lb_listener.httplistener.arn
+    priority     = 100
+    
+    condition {
+        path_pattern {
+            values = ["*"]
+        }        
+    }
+
+    action {
+        type = "forward"
+        target_group_arn = aws_lb_target_group.webserver-tg.arn
+    }
+}
+
 
 resource "aws_security_group" "webserver" {
     name = "terraform-example-instance"
